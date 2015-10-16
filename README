@@ -1,0 +1,64 @@
+ ___ _ _      _         __  __
+| _ |_) |_ __| |_ _  _ / _|/ _|___ _ _
+| _ \ |  _(_-<  _| || |  _|  _/ -_) '_|
+|___/_|\__/__/\__|\_,_|_| |_| \___|_|
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Olivia Lucca Fraser         B00109376
+October 16, 2015
+
+Bitstuffer is a simple command-line utility whose sole purpose is
+stuffing 1-bits into a bitstream at specified intervals, and
+unstuffing those same bits (or other bits, should the user desire). It
+can read input both from files and from stdin, making it easy to chain
+two or more instances of Bitstuffer together.
+
+This feature makes it easy to test the Bitstuffer's fidelity. The Unix
+command
+
+./bitstuffer -sqcp 5 -f sample.txt | ./bitstuffer -uqcp 5 -f -
+
+will load sample.txt into memory as a byte array, bit-stuff (-s) that
+bytearray by inserting a 1-bit at 5-bit intervals (as specified by the
+option -p 5), and then output the result as raw bytes (using the %c
+format string specifier, as specified by -c). This will then pass
+through a Unix pipe to the second instance of bitstuffer, which has
+been instructed to unstuff (-u) the input that it reads from stdin (-f
+-), which is returns in raw byte format (as characters). Verbose
+output has been turned off for each instance with the -q flag. If you
+want to take a look at this output, you can switch it on with -v, and
+it will be sent to stderr (so as not to clog the pipe). But it really
+is *quite* verbose, and so is not recommended unless the input size is
+quite small. For something like
+
+echo hello | ./bitstuffer -svcp 5 -f - | ./bitstuff uvcp 5 -f -
+
+it may be interesting to look at, as it includes a display of the
+bitstream and highlighting of the stuffed bits.
+
+Bitstuffer writes to stdout by default. If you want to write a
+bitstuffed bytearray to a file, the best way is to just use output
+redirection, like so
+
+./bitstuffer -svcp 5 -f sample.txt > sample.stf
+
+Bitstuffer can also output its bytearrays in hexidecimal and binary
+notation. To achieve this, try
+
+./bitstuffer -sqxp 5 -f sample.txt
+
+for hex, or
+
+./bitstuffer -sqbp 5 -f sample.txt
+
+for binary notation.
+
+Many of these command line options have default settings, for ease of
+use (for example, Bitstuffer expects input from stdin, unless told
+otherwise). For details, run ./bitstuffer -h.
+
+To compile
+----------
+gcc bitstuffer.c -o bitstuffer
+
+
+
