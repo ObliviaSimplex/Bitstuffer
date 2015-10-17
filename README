@@ -7,10 +7,12 @@ Olivia Lucca Fraser
 October 16, 2015
 
 Bitstuffer is a simple command-line utility whose sole purpose is
-stuffing 1-bits into a bitstream at specified intervals, and
-unstuffing those same bits (or other bits, should the user desire). It
-can read input both from files and from stdin, making it easy to chain
-two or more instances of Bitstuffer together.
+inserting 0-bits into a bitstream after every n consecutive 1-bits,
+and then detecting and unstuffing those same bits (or other bits,
+should the user desire) at some other time (typically, on the
+receiving end of a transmission that stuffs before sending). It can
+read input from both files and from stdin, making it easy to chain two
+or more instances of Bitstuffer together.
 
 This feature makes it easy to test the Bitstuffer's fidelity. The Unix
 command
@@ -18,17 +20,17 @@ command
 ./bitstuffer -sqcp 5 -f sample.txt | ./bitstuffer -uqcp 5 -f -
 
 will load sample.txt into memory as a byte array, bit-stuff (-s) that
-bytearray by inserting a 1-bit at 5-bit intervals (as specified by the
-option -p 5), and then output the result as raw bytes (using the %c
-format string specifier, as specified by -c). This will then pass
-through a Unix pipe to the second instance of bitstuffer, which has
-been instructed to unstuff (-u) the input that it reads from stdin (-f
--), which is returns in raw byte format (as characters). Verbose
-output has been turned off for each instance with the -q flag. If you
-want to take a look at this output, you can switch it on with -v, and
-it will be sent to stderr (so as not to clog the pipe). But it really
-is *quite* verbose, and so is not recommended unless the input size is
-quite small. For something like
+bytearray by inserting a 0-bit after every series of 5 consecutive 1s
+(as specified by the option -p 5), and then output the result as raw
+bytes (using the %c format string specifier, as specified by -c). This
+will then pass through a Unix pipe to the second instance of
+bitstuffer, which has been instructed to unstuff (-u) the input that
+it reads from stdin (-f -), which is returns in raw byte format (as
+characters). Verbose output has been turned off for each instance with
+the -q flag. If you want to take a look at this output, you can switch
+it on with -v, and it will be sent to stderr (so as not to clog the
+pipe). But it really is *quite* verbose, and so is not recommended
+unless the input size is quite small. For something like
 
 echo hello | ./bitstuffer -svcp 5 -f - | ./bitstuff uvcp 5 -f -
 
@@ -60,5 +62,35 @@ To compile
 ----------
 gcc bitstuffer.c -o bitstuffer
 
+
+Note:
+=====
+
+Readable text actually offers a poor test case for a 5-bit bitstuffer
+(5-bit bitstuffers being the canonical sort). This is because the
+ASCII character set is actually quite poor in 11111-sequences. This can
+be verified quickly with a bit of python:
+
+for i in range(0xff):
+  if "11111" in bin(i):
+    print hex(i), "=", chr(i)
+
+This gives us a pretty slim set of readable characters: >?+|}~, to be
+precise. The sample text that was distributed with this assignment has
+none of these characters:
+
+$ cat sample.txt | tr -dc ">?+|}~" | wc -c
+0
+
+Could adjacent bytes be a source of 11111-sequences in a bitstream,
+then? If the bytes are all printable ASCII characters, then this isn't
+going to make a difference. Every standard, printable ASCII character
+has a leading zero (they are all less than 128, or are the "positive"
+bytes, if you're thinking of them in terms of signed chars).
+
+The bitstuffer is therefore best tested with either a smaller
+bitstuffing interval (the "period" parameter) or with raw binary
+bitstreams. This is where the hexidecimal and binary output formats in
+Bitstuffer come in handy.
 
 

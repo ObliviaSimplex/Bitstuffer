@@ -17,11 +17,13 @@
 #define LOG stderr
 #define MAXBUFFERSIZE 0x10000  // 64K
 
+#define YES 1
+#define NO 0
 
 void byte2bitstring(unsigned char byte, unsigned char *arr);
 void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period, unsigned long int idx);
 void bitstuffer(unsigned char *arr, unsigned int len,
-                unsigned int period, int stuff, int verbose);
+                unsigned int period, int stuff, int verbose, unsigned char stf);
  
 int main(int argc, char **argv){
   FILE *fd = stdin;
@@ -29,32 +31,41 @@ int main(int argc, char **argv){
     P = PER_DEFAULT,
     S = OPERATION_DEFAULT,
     verbose = VERBOSE_DEFAULT,
-    readstdin = 1,
-    binary = 0,
-    raw = 1,
+    readstdin = YES,
+    binary = NO,
+    raw = YES,
     opt,
-    wrap = 0 ;
+    wrap = NO;
   char filename[MAXFILENAMELENGTH] = "stdin\0";
   char format[8] = "%c";
-
+  unsigned char stf = 0;
+  
   if (argc < 2)
     goto help;
   
-  while ((opt = getopt(argc, argv, "usqbcr:vp:f:x")) != -1){
+  while ((opt = getopt(argc, argv, "10usqbcr:vp:f:x")) != -1){
     switch (opt) {
     case 'u':
-      S=0;
+      S = NO;
       break;
     case 's':
-      S=1;
+      S = YES;
       break;
     case 'p':
       P = atoi(optarg);
-      if (P < 2){
+      if (P == 1){
         fprintf(stderr,"ERROR: Period must be 2 or greater. Otherwise, you're just stuffing\n"
-                "every bit. The system will grow angry, and heaps will overflow.\n");
+                "every bit. The system will grow angry, and heaps will overflow.\n"
+                "The exception to this rule is that a period of 0 may be used to\n"
+                "turn off stuffing.\n");
         exit(EXIT_FAILURE);
       }
+      break;
+    case '1':
+      stf = 1;
+      break;
+    case '0':
+      stf = 0;
       break;
     case 'f':
       strncpy(filename,optarg,MAXFILENAMELENGTH);
@@ -62,24 +73,24 @@ int main(int argc, char **argv){
         readstdin=0;
       break;
     case 'c':
-      raw = 1;
+      raw = YES;
       strncpy(format,"%c",2);
       break;
     case 'x':
-      raw = 0;
+      raw = NO;
       wrap = 80/3;
       strncpy(format,"%2.2x ",6);
       break;
     case 'b':
-      raw = 0;
+      raw = NO;
       wrap = 80/9;
-      binary = 1;
+      binary = YES;
       break;
     case 'v':
-      verbose =1;
+      verbose = YES;
       break;
     case 'q':
-      verbose=0;
+      verbose = NO;
       break;
     case 'h':
     default:
@@ -92,6 +103,8 @@ int main(int argc, char **argv){
               "-c: output bytes as ASCII characters [qdefault]\n"
               "-x: output bytes in hexidecimal format\n"
               "-b: output bytes in binary format\n"
+              "-1: stuff with 1-bits\n"
+              "-0: stuff with 0-bits\n"
               "-f <filename> : name of file to bitstuff.\n"
               "-f - : read from stdin [default]\n"
               "-h: display this help menu.\n",
@@ -118,7 +131,7 @@ int main(int argc, char **argv){
   bytecount += ham;
 
   /*** The main event ***/
-  bitstuffer(buffer, strlen(buffer), P, S, verbose);
+  bitstuffer(buffer, strlen(buffer), P, S, verbose, stf);
   /**********************/
   
   int j=0;
@@ -156,45 +169,47 @@ int main(int argc, char **argv){
  * allocate that memory in main()).
  ***/ 
 void bitstuffer(unsigned char *arr, unsigned int len,
-                unsigned int period, int stuff, int verbose){
+                unsigned int period, int stuff, int verbose, unsigned char stf){
   
   unsigned long int bitlen = len*32*sizeof(unsigned char);
   unsigned char *bitbuffer = malloc (bitlen * sizeof(char));
   memset(bitbuffer,0,bitlen);
   unsigned long int idx = 0;
   unsigned long int skips=0, p, i;
-  unsigned char byte, bit;
+  unsigned char byte=0, bit=0;
+
   
+  int tally = 0;
+  int ok = YES;
   for (p = 0; p < len; p++){
     byte = *(arr + p);
     for (i=0; i < 8; i++){
       bit = byte & 1;
-      byte >>= 1;
-      if (period > 0 && idx % period == 0){
+      //      fprintf(LOG, "BYTE: %2.2x     BIT: %d\n",byte,bit);
+      if (ok)
+        bitbuffer[idx++] = bit;
+      else
+        ok = YES;  // it's okay, now because we discarded a zero
+      tally += bit;
+      tally *= bit;
+      ok = (tally != period) || stuff;
+      if (tally == period){
+        tally = 0;
+        // insert an extra 0 if stuffing, but skip next bit if unstuffing
         if (stuff)
-          bitbuffer[idx++] = 1;
-        else {
-          skips ++;
-          goto skip;
-        }
+          bitbuffer[idx++] = stf;
+         
       }
-      bitbuffer[idx-skips] = bit; 
-    skip:
-      idx++; 
-      if (idx >= bitlen){
-        fprintf(LOG, "bitbuffer overflow. FATAL.\n");
-        exit(EXIT_FAILURE);
-      }
+      byte >>= 1;
+
+      
+      
     }
-    if (verbose) showbitbuffer(bitbuffer,idx-skips, period*stuff, 0);
+    if (verbose) showbitbuffer(bitbuffer,idx, period*stuff, 0);
   }
+    
   
-  idx -= skips;
   
-  if (verbose) fprintf(LOG,"---\n");
-  int roundoff = (idx/8)*8;
-  memset( (bitbuffer + roundoff-2), 0, bitlen-roundoff); 
-  if (verbose) showbitbuffer(bitbuffer, idx, period*stuff, 0);
   if (verbose) fprintf(LOG,"---\n");
   
   p = 0;
@@ -259,7 +274,8 @@ void byte2bitstring(unsigned char byte, unsigned char *arr){
   }
 }
 
+void properstuffer(unsigned char *arr, unsigned int len,
+                   unsigned int period, int stuff, int verbose){
+  
 
-
-
-
+}
