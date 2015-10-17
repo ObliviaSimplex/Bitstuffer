@@ -38,6 +38,7 @@ int main(int argc, char **argv){
     inbytes = 0,
     dirty = NO,
     opt,
+    afterlength = 0,
     wrap = NO;
   char filename[MAXFILENAMELENGTH] = "stdin\0";
   char format[8] = "%c";
@@ -110,8 +111,6 @@ int main(int argc, char **argv){
               "-c: output bytes as ASCII characters [qdefault]\n"
               "-x: output bytes in hexidecimal format\n"
               "-b: output bytes in binary format\n"
-              "-1: stuff with 1-bits\n"
-              "-0: stuff with 0-bits\n"
               "-f <filename> : name of file to bitstuff.\n"
               "-f - : read from stdin [default]\n"
               "-h: display this help menu.\n",
@@ -140,7 +139,7 @@ int main(int argc, char **argv){
   /*** The main event ***/
   bytecount = bitstuffer(buffer, bytecount, P, S, verbose, stf);
   /**********************/
-  
+
   int j=0;
   unsigned char ch, bitstring[8*sizeof(unsigned char)+1];
   while (j < bytecount && ((ch = buffer[j++]) != '\0') || dirty){
@@ -185,7 +184,6 @@ int bitstuffer(unsigned char *arr, unsigned int len,
   unsigned long int idx = 0;
   unsigned long int skips=0, p, i;
   unsigned char byte=0, bit=0;
-
   
   int tally = 0;
   int ok = YES;
@@ -200,8 +198,8 @@ int bitstuffer(unsigned char *arr, unsigned int len,
         ok = YES;  // it's okay, now because we discarded a zero
       tally += bit;
       tally *= bit;
-      ok = (tally != period) || stuff;
-      if (tally == period){
+      ok = (tally != period) || stuff || !period;
+      if (period && tally == period){
         tally = 0;
         // insert an extra 0 if stuffing, but skip next bit if unstuffing
         if (stuff)
