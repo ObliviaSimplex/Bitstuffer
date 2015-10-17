@@ -93,4 +93,20 @@ bitstuffing interval (the "period" parameter) or with raw binary
 bitstreams. This is where the hexidecimal and binary output formats in
 Bitstuffer come in handy.
 
+A better test might be:
+
+$ echo -en "\xff\xff\fa Hello, world. \xff\xff" > test.case
+
+$ ./bitstuff -sbp 0 -f test.case > test.out.1
+
+## -p 0 turns off bitstuffing ##
+
+$ ./bitstuff -scp 5 -f test.case | ./bitstuff -ubp 5 > test.out.2
+
+$ diff test.out.1 test.out.2
+
+
+
+
+
 
