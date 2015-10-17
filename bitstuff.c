@@ -21,8 +21,9 @@
 #define NO 0
 
 void byte2bitstring(unsigned char byte, unsigned char *arr);
-void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period, unsigned long int idx);
-void bitstuffer(unsigned char *arr, unsigned int len,
+void showbitbuffer(const unsigned char *bitbuffer, int len,
+                   unsigned int period, unsigned long int idx);
+int bitstuffer(unsigned char *arr, unsigned int len,
                 unsigned int period, int stuff, int verbose, unsigned char stf);
  
 int main(int argc, char **argv){
@@ -34,6 +35,8 @@ int main(int argc, char **argv){
     readstdin = YES,
     binary = NO,
     raw = YES,
+    inbytes = 0,
+    dirty = NO,
     opt,
     wrap = NO;
   char filename[MAXFILENAMELENGTH] = "stdin\0";
@@ -43,13 +46,17 @@ int main(int argc, char **argv){
   if (argc < 2)
     goto help;
   
-  while ((opt = getopt(argc, argv, "10usqbcr:vp:f:x")) != -1){
+  while ((opt = getopt(argc, argv, "10usqbcd:vp:f:x")) != -1){
     switch (opt) {
     case 'u':
       S = NO;
       break;
     case 's':
       S = YES;
+      break;
+    case 'd':
+      dirty = YES;
+      inbytes = atoi(optarg);
       break;
     case 'p':
       P = atoi(optarg);
@@ -124,19 +131,19 @@ int main(int argc, char **argv){
 
   do {
     buffer[bytecount++] = fgetc(fd);  
-  } while  (!feof(fd) && bytecount < MAXBUFFERSIZE );
+  } while  (!feof(fd) && bytecount < MAXBUFFERSIZE && (!dirty || bytecount <= inbytes));
 
   buffer[bytecount-1] = '\0';
   int ham = bytecount;
   bytecount += ham;
 
   /*** The main event ***/
-  bitstuffer(buffer, strlen(buffer), P, S, verbose, stf);
+  bytecount = bitstuffer(buffer, bytecount, P, S, verbose, stf);
   /**********************/
   
   int j=0;
   unsigned char ch, bitstring[8*sizeof(unsigned char)+1];
-  while (j < bytecount && (ch = buffer[j++]) != '\0'){
+  while (j < bytecount && ((ch = buffer[j++]) != '\0') || dirty){
     if (binary) {
       memset(bitstring,0,9);
       byte2bitstring(ch, bitstring);
@@ -164,11 +171,12 @@ int main(int argc, char **argv){
  *       int stuff: a boolean flag: 1 to stuff, 0 to unstuff
  *       int verbose: another boolean flag: 1 for verbose, 0 for quiet
  *
- * Returns nothing, and writes the new, bit-stuffed array to the memory
- * allocated to the initial array (this is why we're careful to over-
- * allocate that memory in main()).
+ * Returns the length of the new bytestring, and writes the new,
+ * bit-stuffed array to the memory allocated to the initial array
+ * (this is why we're careful to over- allocate that memory in
+ * main()).
  ***/ 
-void bitstuffer(unsigned char *arr, unsigned int len,
+int bitstuffer(unsigned char *arr, unsigned int len,
                 unsigned int period, int stuff, int verbose, unsigned char stf){
   
   unsigned long int bitlen = len*32*sizeof(unsigned char);
@@ -231,7 +239,7 @@ void bitstuffer(unsigned char *arr, unsigned int len,
   *(arr + p) = '\0';  // terminate string with null byte
 
   free(bitbuffer);
-  return;
+  return p;
 }
 
 /***
