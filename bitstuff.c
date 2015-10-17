@@ -133,8 +133,8 @@ int main(int argc, char **argv){
   } while  (!feof(fd) && bytecount < MAXBUFFERSIZE && (!dirty || bytecount <= inbytes));
 
   buffer[bytecount-1] = '\0';
-  int ham = bytecount;
-  bytecount += ham;
+  //  int ham = bytecount;
+  //bytecount += ham;
 
   /*** The main event ***/
   bytecount = bitstuffer(buffer, bytecount, P, S, verbose, stf);
@@ -253,15 +253,26 @@ int bitstuffer(unsigned char *arr, unsigned int len,
  *        unsigned long int idx: the current index to the active cell of the bitbuffer
  ***/
 void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period, unsigned long int idx){
-  int i;
+  int  i, tally = 0;
+  char bit;
+  int highlight = NO;
+  
   len -= idx;
   for (i = 0; i < len; i++){
+    bit = *(bitbuffer + idx + i);
+    tally += bit;
+    tally *= bit;
+
+
     if (i > 0 && i % 8 == 0)
       fprintf(LOG," ");
-    if (period > 0 && (idx + i) % period == 0)
-      fprintf (LOG,MAGENTA);
-    fprintf(LOG,"%d%s",*(bitbuffer + idx + i),COLOR_RESET);
-  }
+    fprintf(LOG,"%s%d%s", highlight? MAGENTA:"",bit,COLOR_RESET);
+    highlight = NO;
+    if (period && period == tally){
+      highlight = YES;
+      tally = 0;
+    }
+      }
   fprintf(LOG,"\n");
   return;
 }

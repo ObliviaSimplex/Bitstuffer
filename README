@@ -105,6 +105,10 @@ $ ./bitstuff -scp 5 -f test.case | ./bitstuff -ubp 5 > test.out.2
 
 $ diff test.out.1 test.out.2
 
+Reducing the period size to 4 works well for ASCII files as well.
+(Reducing it to 3 seems to cause a bit of trouble, probably due to
+unsanitized input. Something is getting fuzzed and should be
+debugged.)
 
 
 
