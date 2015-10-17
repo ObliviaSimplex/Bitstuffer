@@ -50,6 +50,11 @@ int main(int argc, char **argv){
       break;
     case 'p':
       P = atoi(optarg);
+      if (P < 2){
+        fprintf(stderr,"ERROR: Period must be 2 or greater. Otherwise, you're just stuffing\n"
+                "every bit. The system will grow angry, and heaps will overflow.\n");
+        exit(EXIT_FAILURE);
+      }
       break;
     case 'f':
       strncpy(filename,optarg,MAXFILENAMELENGTH);
