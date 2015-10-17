@@ -1,0 +1,68 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+void setbit(unsigned char *byte, unsigned char index, unsigned char bit){
+  char mask = 1 << index;
+  *byte = bit? *byte | mask : *byte & ~mask;
+}
+
+void flipbit(unsigned char *byte, unsigned char index){
+  char mask = 1 << index;
+  char xmask = *byte | mask;
+  *byte ^= xmask;
+}
+
+unsigned char getbit(unsigned char *byte, unsigned char index){
+  unsigned char mask = 1 << index;
+  return *byte & mask;
+}
+
+/***
+ * Converts a byte to a readable string of '1' and '0' chars.
+ *
+ * @param unsigned char byte: the byte to convert
+ *        unsigned char *arr: the array to which to write
+ ***/
+void byte2bitstring(unsigned char byte, unsigned char *arr){
+  int i;
+  for (i=7; i >= 0; i--){ // other direction? probably. 
+    *(arr + i) = '0'+(byte & 1);
+    byte >>= 1;
+  }
+}
+
+
+int main(int argc, char **argv){
+  unsigned char byte;
+  printf("Enter byte > ");
+  scanf("%c",&byte);
+  char bitstring[9];
+  
+  byte2bitstring(byte, bitstring);
+  printf("BYTE: %s     %2.2x",bitstring, byte);
+  unsigned char index;
+  printf("Peek index > ");
+  scanf("%d",&index);
+
+  unsigned char bit;
+  bit = getbit(&byte, index);
+  printf("Bit at index %d: %d\n", index, bit);
+
+  printf("Flip index > ");
+  scanf("%d",&index);
+  flipbit(&byte,index);
+
+  byte2bitstring(byte, bitstring);
+  printf("BYTE: %s     %2.2x",bitstring, byte);
+
+  printf("Set %%d to %%d > ");
+  scanf("%d%d",&index, &bit);
+
+  setbit(&byte,index, bit);
+  byte2bitstring(byte,bitstring);
+  printf("BYTE: %s     %2.2x",bitstring, byte);
+  
+  return 0;
+}

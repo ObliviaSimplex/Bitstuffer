@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "bitops.h"
 
 #define GREEN   "\x1b[32m"
 #define YELLOW  "\x1b[33m"
@@ -108,7 +109,7 @@ int main(int argc, char **argv){
               "Usage: %s [OPTIONS] -p <period> -f <filename> \n"
               "-s: bitstuffing [default]\n"
               "-u: unstuffing\n"
-              "-c: output bytes as ASCII characters [qdefault]\n"
+              "-c: output bytes as characters [default]\n"
               "-x: output bytes in hexidecimal format\n"
               "-b: output bytes in binary format\n"
               "-f <filename> : name of file to bitstuff.\n"
@@ -277,22 +278,3 @@ void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period,
   return;
 }
 
-/***
- * Converts a byte to a readable string of '1' and '0' chars.
- *
- * @param unsigned char byte: the byte to convert
- *        unsigned char *arr: the array to which to write
- ***/
-void byte2bitstring(unsigned char byte, unsigned char *arr){
-  int i;
-  for (i=7; i >= 0; i--){ // other direction? probably. 
-    *(arr + i) = '0'+(byte & 1);
-    byte >>= 1;
-  }
-}
-
-void properstuffer(unsigned char *arr, unsigned int len,
-                   unsigned int period, int stuff, int verbose){
-  
-
-}
