@@ -18,14 +18,13 @@
 #define LOG stderr
 #define MAXBUFFERSIZE 0x10000  // 64K
 
-#define YES 1
-#define NO 0
 
 void byte2bitstring(unsigned char byte, unsigned char *arr);
 void showbitbuffer(const unsigned char *bitbuffer, int len,
                    unsigned int period, unsigned long int idx);
-int bitstuffer(unsigned char *arr, unsigned int len,
-                unsigned int period, int stuff, int verbose, unsigned char stf);
+unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
+                           unsigned int period, int stuff, int verbose,
+                           unsigned char stf);
  
 int main(int argc, char **argv){
   FILE *fd = stdin;
@@ -33,14 +32,13 @@ int main(int argc, char **argv){
     P = PER_DEFAULT,
     S = OPERATION_DEFAULT,
     verbose = VERBOSE_DEFAULT,
-    readstdin = YES,
-    binary = NO,
-    raw = YES,
+    readstdin = ON,
+    binary = OFF,
+    raw = ON,
     inbytes = 0,
-    dirty = NO,
+    dirty = OFF,
     opt,
-    afterlength = 0,
-    wrap = NO;
+    wrap = OFF;
   char filename[MAXFILENAMELENGTH] = "stdin\0";
   char format[8] = "%c";
   unsigned char stf = 0;
@@ -51,13 +49,13 @@ int main(int argc, char **argv){
   while ((opt = getopt(argc, argv, "10usqbcd:vp:f:x")) != -1){
     switch (opt) {
     case 'u':
-      S = NO;
+      S = OFF;
       break;
     case 's':
-      S = YES;
+      S = ON;
       break;
     case 'd':
-      dirty = YES;
+      dirty = ON;
       inbytes = atoi(optarg);
       break;
     case 'p':
@@ -82,24 +80,24 @@ int main(int argc, char **argv){
         readstdin=0;
       break;
     case 'c':
-      raw = YES;
+      raw = ON;
       strncpy(format,"%c",2);
       break;
     case 'x':
-      raw = NO;
+      raw = OFF;
       wrap = 80/3;
       strncpy(format,"%2.2x ",6);
       break;
     case 'b':
-      raw = NO;
+      raw = OFF;
       wrap = 80/9;
-      binary = YES;
+      binary = ON;
       break;
     case 'v':
-      verbose = YES;
+      verbose = ON;
       break;
     case 'q':
-      verbose = NO;
+      verbose = OFF;
       break;
     case 'h':
     default:
@@ -127,23 +125,22 @@ int main(int argc, char **argv){
 
   unsigned char *buffer = malloc(MAXBUFFERSIZE*2*sizeof(unsigned char));
   int bytecount = 0;
-  char c;
 
   do {
     buffer[bytecount++] = fgetc(fd);  
   } while  (!feof(fd) && bytecount < MAXBUFFERSIZE && (!dirty || bytecount <= inbytes));
 
   buffer[bytecount-1] = '\0';
-  //  int ham = bytecount;
-  //bytecount += ham;
 
   /*** The main event ***/
-  bytecount = bitstuffer(buffer, bytecount, P, S, verbose, stf);
+  unsigned char *stuffed;
+  stuffed = bitstuffer(buffer, bytecount, P, S, verbose, stf);
+  bytecount = strlen(stuffed);
   /**********************/
 
   int j=0;
   unsigned char ch, bitstring[8*sizeof(unsigned char)+1];
-  while (j < bytecount && ((ch = buffer[j++]) != '\0') || dirty){
+  while ((j < bytecount && ((ch = stuffed[j++]) != '\0')) || dirty){
     if (binary) {
       memset(bitstring,0,9);
       byte2bitstring(ch, bitstring);
@@ -155,7 +152,8 @@ int main(int argc, char **argv){
       printf("\n");
   }
   if (!raw) printf("\n");
-    
+
+  free(stuffed);
   free(buffer);
   return 0;
 }
@@ -176,69 +174,44 @@ int main(int argc, char **argv){
  * (this is why we're careful to over- allocate that memory in
  * main()).
  ***/ 
-int bitstuffer(unsigned char *arr, unsigned int len,
+unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
                 unsigned int period, int stuff, int verbose, unsigned char stf){
   
-  unsigned long int bitlen = len*32*sizeof(unsigned char);
-  unsigned char *bitbuffer = malloc (bitlen * sizeof(char));
-  memset(bitbuffer,0,bitlen);
-  unsigned long int idx = 0;
-  unsigned long int skips=0, p, i;
+  unsigned long int bitlen = len + len/period + len%period;
+  unsigned char *bitbuffer;
+  if ((bitbuffer = malloc (bitlen * sizeof(char))) == NULL){
+    fprintf(stderr, "Fatal error allocating memory for bitbuffer. Exiting.\n");
+    exit(EXIT_FAILURE);
+  }
+  memset(bitbuffer,0,bitlen*sizeof(char));
+  unsigned long int bitindex = 0;
+  unsigned long int p, i;
   unsigned char byte=0, bit=0;
+
   
   int tally = 0;
-  int ok = YES;
+  int ok = ON;
   for (p = 0; p < len; p++){
     byte = *(arr + p);
     for (i=0; i < 8; i++){
       bit = byte & 1;
-      //      fprintf(LOG, "BYTE: %2.2x     BIT: %d\n",byte,bit);
+      byte >>= 1;
       if (ok)
-        bitbuffer[idx++] = bit;
-      else
-        ok = YES;  // it's okay, now because we discarded a zero
+        setbit(bitbuffer, bitindex++, bit);//bitbuffer[idx++] = bit;
+      else 
+        ok = ON;  // it's okay, now because we discarded a zero
       tally += bit;
       tally *= bit;
       ok = (tally != period) || stuff || !period;
       if (period && tally == period){
         tally = 0;
-        // insert an extra 0 if stuffing, but skip next bit if unstuffing
         if (stuff)
-          bitbuffer[idx++] = stf;
-         
+          setbit(bitbuffer, bitindex++, stf); 
       }
-      byte >>= 1;
-
-      
-      
     }
-    if (verbose) showbitbuffer(bitbuffer,idx, period*stuff, 0);
+    if (verbose) showbitbuffer(bitbuffer, bitindex, period*stuff, 0);
   }
-    
-  
-  
-  if (verbose) fprintf(LOG,"---\n");
-  
-  p = 0;
-  bitlen = idx;
-  idx = 0;
-  
-  while (idx < bitlen){
-    if (verbose)
-      showbitbuffer(bitbuffer, bitlen, period*stuff, idx);
-    byte = '\0';
-    for (i = 0; i < 8; i++){
-      byte <<= 1;
-      byte += bitbuffer[idx + (7-i)];
-    }
-    idx += 8;         // hop to the next byte
-    *(arr + p++) = byte;
-  }
-  
-  *(arr + p) = '\0';  // terminate string with null byte
-
-  free(bitbuffer);
-  return p;
+  return(bitbuffer);
 }
 
 /***
@@ -256,21 +229,20 @@ int bitstuffer(unsigned char *arr, unsigned int len,
 void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period, unsigned long int idx){
   int  i, tally = 0;
   char bit;
-  int highlight = NO;
+  int highlight = OFF;
   
   len -= idx;
   for (i = 0; i < len; i++){
-    bit = *(bitbuffer + idx + i);
+    bit = getbit(bitbuffer, idx);//*(bitbuffer + idx + i);
     tally += bit;
     tally *= bit;
-
 
     if (i > 0 && i % 8 == 0)
       fprintf(LOG," ");
     fprintf(LOG,"%s%d%s", highlight? MAGENTA:"",bit,COLOR_RESET);
-    highlight = NO;
+    highlight = OFF;
     if (period && period == tally){
-      highlight = YES;
+      highlight = ON;
       tally = 0;
     }
       }
