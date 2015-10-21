@@ -46,7 +46,7 @@ int main(int argc, char **argv){
   if (argc < 2)
     goto help;
   
-  while ((opt = getopt(argc, argv, "10usqbcd:vp:f:x")) != -1){
+  while ((opt = getopt(argc, argv, "10usqbcd:p:f:x")) != -1){
     switch (opt) {
     case 'u':
       S = OFF;
@@ -92,9 +92,6 @@ int main(int argc, char **argv){
       raw = OFF;
       wrap = 80/9;
       binary = ON;
-      break;
-    case 'v':
-      verbose = ON;
       break;
     case 'q':
       verbose = OFF;
@@ -169,28 +166,29 @@ int main(int argc, char **argv){
  *       int stuff: a boolean flag: 1 to stuff, 0 to unstuff
  *       int verbose: another boolean flag: 1 for verbose, 0 for quiet
  *
- * Returns the length of the new bytestring, and writes the new,
- * bit-stuffed array to the memory allocated to the initial array
- * (this is why we're careful to over- allocate that memory in
- * main()).
+ * @returns a heap-allocated pointer to a new unsigned character array,
+ *          storing a bitstuffed transformation of the initial array. 
  ***/ 
 unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
-                unsigned int period, int stuff, int verbose, unsigned char stf){
+                           unsigned int period, int stuff, int verbose,
+                           unsigned char stf) {
   
-  unsigned long int bitlen = len + len/period + len%period;
-  unsigned char *bitbuffer;
-  if ((bitbuffer = malloc (bitlen * sizeof(char))) == NULL){
-    fprintf(stderr, "Fatal error allocating memory for bitbuffer. Exiting.\n");
-    exit(EXIT_FAILURE);
-  }
-  memset(bitbuffer,0,bitlen*sizeof(char));
+  unsigned long int bitlen = period ?
+    len + len/period + len%period :
+    len;
   unsigned long int bitindex = 0;
   unsigned long int p, i;
   unsigned char byte=0, bit=0;
-
-  
   int tally = 0;
   int ok = ON;
+  
+  unsigned char *bitbuffer;
+  if ((bitbuffer = calloc (bitlen, sizeof(char))) == NULL){
+    fprintf(stderr, "Fatal error allocating memory for bitbuffer.\n"
+            "Exiting.\n");
+    exit(EXIT_FAILURE);
+  }
+
   for (p = 0; p < len; p++){
     byte = *(arr + p);
     for (i=0; i < 8; i++){
@@ -209,44 +207,10 @@ unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
           setbit(bitbuffer, bitindex++, stf); 
       }
     }
-    if (verbose) showbitbuffer(bitbuffer, bitindex, period*stuff, 0);
   }
+
+  
   return(bitbuffer);
 }
 
-/***
- * This function is primarily for debugging purposes. It can be activated by passing the verbose
- * flag to the programme from the command line (-v).
- * When activate, this will display the contents of the "bitbuffer" (the buffer filled with bytes
- * masquerading as bits, for ease of manipulation), as a series of *little-endian*, byte-sized
- * binary numbers. It also highlights the stuffed bits in magenta, which is nice. 
- * 
- * @param const unsigned char *bitbuffer: the array of 1s and 0s (not '1's and '0's) to display
- *        int len: the length of that array
- *        unsigned int period: same as in bitstuffer(): the frequency of the stuffed bits 
- *        unsigned long int idx: the current index to the active cell of the bitbuffer
- ***/
-void showbitbuffer(const unsigned char *bitbuffer, int len, unsigned int period, unsigned long int idx){
-  int  i, tally = 0;
-  char bit;
-  int highlight = OFF;
-  
-  len -= idx;
-  for (i = 0; i < len; i++){
-    bit = getbit(bitbuffer, idx);//*(bitbuffer + idx + i);
-    tally += bit;
-    tally *= bit;
-
-    if (i > 0 && i % 8 == 0)
-      fprintf(LOG," ");
-    fprintf(LOG,"%s%d%s", highlight? MAGENTA:"",bit,COLOR_RESET);
-    highlight = OFF;
-    if (period && period == tally){
-      highlight = ON;
-      tally = 0;
-    }
-      }
-  fprintf(LOG,"\n");
-  return;
-}
 
