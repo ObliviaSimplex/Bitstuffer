@@ -1,8 +1,6 @@
 #include "bitops.h"
 #include "unistd.h"
 
-
-#define DEFAULT_GEN 0x0b // in decimal: 11; in binary: 1011
 #define BINARY  0
 #define DECIMAL  1
 #define HEX  2
@@ -10,7 +8,6 @@
 #define MINARGS 0
 #define MAXLEN 0x10000
 #define DEFAULT_GENERATOR 0x04C11DB7
-
 
 #define SEND 1
 #define RECV 0
@@ -46,7 +43,10 @@ int main(int argc, char **argv){
       input_as_binary = FALSE;
       break;
     case 'g':
-      generator = atoi(optarg);
+      if (optarg[0] == '0' && optarg[1] == 'x')
+        sscanf(optarg,"0x%x",&generator);
+      else
+        sscanf(optarg, "%d",&generator);
       break;
     case 'v':
       verbose = TRUE;
@@ -94,13 +94,23 @@ int main(int argc, char **argv){
   //char inputstring[0x1000];
   //scanf("%s",inputstring);
   //bitmsg = make_bitarray(inputstring, strlen(inputstring));
-  
-  fprintf(stderr,"MESSAGE READ: %s\n",bitmsg->array);
-  fprintf(stderr,"IN BINARY:    ");
-  print_bitarray(stderr, bitmsg);
-  fprintf(stderr,"\n");
 
+  if (verbose){
+    fprintf(stderr,"MESSAGE READ: %s\n",bitmsg->array);
+    fprintf(stderr,"IN BINARY:    ");
+    print_bitarray(stderr, bitmsg);
+    fprintf(stderr,"\n");
+  }
+  /// AD HOC:
+  bitmsg->end++;
+  ///
+  
   bitarray_t *newmsg = CRC(bitmsg, generator, SEND);
+
+  if (burst_length){
+    burst_error(newmsg->array, newmsg->end/8, burst_length, 0);
+  }
+  
   bitarray_t *recvmsg = CRC(newmsg, generator, RECV);
   
   destroy_bitarray(newmsg);
@@ -112,19 +122,20 @@ int main(int argc, char **argv){
 
 
 bitarray_t * CRC(bitarray_t *message,
-                    uint32_t generator,
-                    unsigned char send){
+                 uint32_t generator,
+                 unsigned char send){
 
   int shiftbitlen = 0;
+  //generator = end_reverse(generator);
   uint32_t g = generator;
   while ((g >>= 1) != 0)
     shiftbitlen ++;
 
   // It will be helpful to have a mask for grabbing the high bit of the reg.
   uint32_t shiftreg_highmask = (0x1 << (shiftbitlen-1));
-  uint32_t shiftreg_cropmask = ~(0xffff << (shiftbitlen));
+  uint32_t shiftreg_cropmask = ~(0xffffffff << (shiftbitlen)); // mask was too small
   // We drop the MSB of the generator when determining our xor gates.
-  uint32_t xorplate = generator & shiftreg_cropmask;
+  uint32_t xorplate = (generator) & shiftreg_cropmask;
   
   /////////
   if (verbose){
@@ -134,12 +145,11 @@ bitarray_t * CRC(bitarray_t *message,
   }
   //////////
   
-
   bitarray_t *bitmsg_out;
-  fprintf(stderr,"message->end = %d\n",message->end);
+  //fprintf(stderr,"message->end = %d\n",message->end);
   bitmsg_out = calloc(1,sizeof(bitarray_t));
-  bitmsg_out->array = calloc((message->end/8) * 2, sizeof(char));
-  bitmsg_out->end = message->end;
+  bitmsg_out->array = calloc((message->end/8) + shiftbitlen/8 + 2, sizeof(char));
+  bitmsg_out->end = message->end; // + ((send == SEND)? shiftbitlen : 0); //??
   bitmsg_out->residue = 0;
   
   uint32_t bit_index = 0;
@@ -151,19 +161,16 @@ bitarray_t * CRC(bitarray_t *message,
   char *msg_bitstring;
   char xored = 0;
   uint32_t topbit = 0, bit = 0;
-  
+  /*
   fprintf(stderr,"IN:  ");
   print_bitarray(stderr, message);
   fprintf(stderr,"\n");
+  */
+  //////////////////////////////////////////////////////////////
+  while (bit_index < bitmsg_out->end+shiftbitlen){
 
-  int iters = (send == SEND)?
-    bitmsg_out->end + shiftbitlen :
-    bitmsg_out->end;
-
-   //???
-  while (bit_index < iters){
-
-    bit = getbit(message->array, bit_index++);
+    bit = getbit(message->array, bit_index);
+    bit_index ++;
     shiftreg.integer = (shiftreg.integer << 1) & shiftreg_cropmask;
     shiftreg.integer |= bit;
     // When the MSB of the shift register is 1, perform XOR operation
@@ -183,35 +190,53 @@ bitarray_t * CRC(bitarray_t *message,
       xored = 0;
     }
   }
-
+  ////////////////////////////////////////////////////////////
   if (is_big_endian())
     shiftreg.integer = end_reverse(shiftreg.integer);
-  // copy shiftregister contents onto end of message;
-  memcpy(bitmsg_out->array, message->array,
-         message->end/8 + 1);
-  //bitmsg_out->array = message->array;
+
+  //memcpy(bitmsg_out->array, message->array,
+  //       message->end/8 + 2);//((message->end % 8 == 0)? 0 : 1));
+  int j = 0;
+  while (j < (message->end/8)+1)
+    bitmsg_out->array[j] = message->array[j++];
+  /// FALSE POSITIVE FOR CORRUPTION WHEN INPUT EXCEEDS 192 BITS.
+  /// PROBLEM EXISTS FOR BO5TH BINARY AND CHARACTER INPUT
+  /// COMPLETELY PUZZLED
   
   bitmsg_out->residue = shiftreg.integer;
 
-  fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
+  //fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
   int i;
   if (send == SEND) {
     for (i = shiftbitlen-1; i >= 0; i --){
       //for (i=0; i < shiftbitlen; i++){
-      setbit(bitmsg_out->array, bitmsg_out->end++,
-             getbit(shiftreg.bytes,i));
-      
-      fprintf(stderr, "(%d) copying %d from shiftreg to bitmsg_out bit #%d\n",
-              i,getbit(shiftreg.bytes,i), bitmsg_out->end-1);
+      bitarray_push(bitmsg_out, getbit(shiftreg.bytes,i));
+      if (verbose)
+        fprintf(stderr, "(%d) copying %d from shiftreg to"
+                " bitmsg_out bit #%d\n", i,getbit(shiftreg.bytes,i),
+                bitmsg_out->end-1);
      }
+  }
+  
+  
+
+  if (verbose){
+    fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
+    fprintf(stderr,"IN:  ");
+    print_bitarray(stderr, message);
+    fprintf(stderr,"\n");
+    fprintf(stderr,"OUT: ");
+    print_bitarray(stderr, bitmsg_out);
+    fprintf(stderr,"\n\n");
   }
 
   if (send == RECV) {
     if (!bitmsg_out->residue)
-      fprintf(stderr, "NO CORRUPTION DETECTED.\n");
+      fprintf(stdout, "NO CORRUPTION DETECTED.\n");
     else{
-      fprintf(stderr, "*** CORRUPTION DETECTED ***\n");
-      fprintf(stderr, "*** RESIDUE: 0x%lx\n",bitmsg_out->residue);
+      fprintf(stdout, "*** CORRUPTION DETECTED ***\n");
+      fprintf(stdout, "*** RESIDUE: 0x%lx\n",
+              (unsigned long int) bitmsg_out->residue);
     }
   }
 
@@ -223,14 +248,6 @@ bitarray_t * CRC(bitarray_t *message,
           bitmsg_out->end, getbit(bitmsg_out->array, bitmsg_out->end));
   fprintf(stderr, "About to send back: %s\n",bitmsg_out->array);
   */
-  if (verbose){
-    fprintf(stderr,"IN:  ");
-    print_bitarray(stderr, message);
-    fprintf(stderr,"\n");
-    fprintf(stderr,"OUT: ");
-    print_bitarray(stderr, bitmsg_out);
-    fprintf(stderr,"\n\n");
-  }
   return bitmsg_out;
 }
 

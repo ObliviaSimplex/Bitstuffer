@@ -53,7 +53,7 @@ void destroy_bitarray(bitarray_t *ba){
 void setbit(unsigned char *byte, uint32_t index,
             unsigned char bit){
   bit %= 2;
-  unsigned int byte_index = index / 8;
+  unsigned long int byte_index = index / 8;
   unsigned char bit_index = index % 8;
   char mask = 1 << bit_index;
   *(byte + byte_index) = bit?
@@ -61,7 +61,7 @@ void setbit(unsigned char *byte, uint32_t index,
     *(byte + byte_index) & ~mask;
 }
 
-void flipbit(unsigned char *byte, unsigned char index){
+void flipbit(unsigned char *byte, unsigned long int index){
   unsigned int byte_index = index / 8;
   unsigned char bit_index = index % 8;
   char mask = 1 << bit_index;
@@ -69,76 +69,29 @@ void flipbit(unsigned char *byte, unsigned char index){
 }
 
 unsigned char getbitasormask(const unsigned char *byte,
-                             unsigned char index){
-  unsigned int byte_index = index / 8;
-  unsigned char bit_index = index % 8;
+                             unsigned long int index){
+  unsigned long int byte_index = index / 8;
+  unsigned long int bit_index = index % 8;
   unsigned char mask = 1 << bit_index;
   return (*(byte + byte_index) & mask) ;
 }
 
-unsigned char getbit(const unsigned char *byte, unsigned char index){
+unsigned char getbit(const unsigned char *byte, unsigned long int index){
   return !!(getbitasormask(byte, index));
 }
 
-
-/***
- * Bitshifts an entire array over n bits 
- ***/
-unsigned char * rshift_array(const unsigned char *bytearray,
-                            int len, int shift){
-  char bitbuf[2] = "\0";
-  int i, j, b = 0;
-  unsigned char *bytearray2 = calloc(len, sizeof(char));
-  const char topbit = 0x80;
-
-  for (i = 0; i < len; i ++){
-    for (j = 0; j < shift; j ++){
-      bitbuf[b] >>= 1;
-      // now store the underflowing low bits as high bits in bitbuf[b]
-      bitbuf[b] |= topbit * ( 0x1 & *( bytearray + i ) ); 
-      *( bytearray2 + i ) = *( bytearray + i ) >> 1;    
-    }
-    *( bytearray2 + i ) = *( bytearray + i ) | bitbuf[!b];
-    // add the underflow from the last byte
-    bitbuf[!b] = 0; 
-    b = !b;         // cycle the bitbuf index mod 2
-  }
-
-  return bytearray2;
+void bitarray_push(bitarray_t *ba, unsigned char bit){
+  setbit(ba->array, (ba->end)++, bit);
 }
 
-unsigned char * shift_array(const unsigned char *bytearray1,
-                              int len, int shift, int direction){
-  // a bit less efficient, maybe, but simpler, more modular
-  unsigned char *bytearray2 = calloc(len+1, sizeof(char));
-  int i, j;
-  i = (direction == RIGHT)? 0 : shift;
-  j = (direction == RIGHT)? shift : 0;
-   
-
-  while (i < (len + 1) * 8)
-    setbit(bytearray2, j++, getbit(bytearray1, i++));
+unsigned char bitarray_pop(bitarray_t *ba){
+  if (!ba->end){
+    fprintf(stderr,"ERROR: Attempt to pop an empty bitarray.\n");
+    exit(EXIT_FAILURE);
+  }
     
-  return bytearray2;
+  return getbit(ba->array, --(ba->end));
 }
-
- 
-
-unsigned char * xor_arrays(const unsigned char *a, int alen,
-                           const unsigned char *b, int blen){
-
-  // don't forget to free result when you're done with it!
-  int i, min = (alen <= blen)? alen : blen;
-
-  unsigned char *result = calloc (min, sizeof(char));
-  for (i = 0; i < min; i ++){
-    *( result + i ) = *( a + i) ^ *( b + i );
-  }
-  return result;
-}
-
-
-
 
 /***
  * Converts a byte to a readable string of '1' and '0' chars.
@@ -226,7 +179,7 @@ void bitarray2bytearray(char *bitarray, char *bytearray, int len){
 
 
 void burst_error(unsigned char *message, int msglen,
-                            int errbitlen, int highlow){
+                 int errbitlen, int highlow){
 
   int errbytes = errbitlen / 8;
   unsigned char errbytemask = 0xffff << (errbitlen % 8);
@@ -262,8 +215,7 @@ uint32_t end_reverse (uint32_t l){
   for (i = 0; i < 4; i++){
     r <<= 8;
     r |= (mask & l) >> (i*8);
-    mask <<= 8;
-    
+    mask <<= 8;    
   }
   return r;
 }
@@ -319,24 +271,26 @@ bitarray_t * read_binary (FILE *channel){
   uint8_t * array = calloc(size,sizeof(uint8_t));
   int b = 0, i = 0;
   char glyph;
-  do {
-    glyph = fgetc(channel);
-    i = b++/8;
+  while (((glyph = fgetc(channel)) != endsig) && (!feof(channel))){
+    i = b/8; b++;
     array[i] <<= 1;
     array[i] |= (glyph-'0');
-    if (i >= size*3/4){
+    printf("reading %c -- ",glyph);
+    printf("array[%d] = %2.2x\n",i,array[i]);
+    if (i >= (size*3)/4){
       size *= 2;
       uint8_t *copy = calloc(size,sizeof(uint8_t));
       memcpy(copy, array, i);
       free(array);
       array = copy;
     }
-  } while (!feof(channel) && glyph != endsig);
-
-  if (glyph == endsig)
-    array[i-1] = '\0';
-  array[i] = '\0';
-  bitarray_t *ba = make_bitarray(array,i);
+  };
+  i++;
+  bitarray_t *ba = calloc(1, sizeof(bitarray_t));
+  ba->array = calloc(i,sizeof(char));
+  memcpy(ba->array, array,i);
+  ba->end = b;
+  ba->residue = 0;
   return ba;  
 }
 
