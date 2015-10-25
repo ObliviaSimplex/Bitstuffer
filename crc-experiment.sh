@@ -82,7 +82,8 @@ for (( j=0; j < $W; j++ )); do
 done
 echo
 echo
-echo DETECTED CORRUPTION IN $CAUGHT OF $i CASES
+echo DETECTED CORRUPTION IN $CAUGHT OF $TRIALS ERROR CASES, AND
+echo IN $CONTROL OF $CF CONTROL CASES.
 echo MISSED BURSTS OF THE FOLLOWING SIZES:
 echo $MISSES | tr " " "\\n" | sort -n| uniq | tr "\\n" " "
 echo
@@ -92,8 +93,8 @@ echo "BURST ERROR LENGTH     |    NUMBER OF FRAMES     |    NUMBER DETECTED"
 echo "-----------------------------------------------------------------------"
 printf "UNDER %d\t\t\t%d\t\t\t%d\n" $REF $UF $UNDER
 printf "EQUAL TO %d\t\t\t%d\t\t\t%d\n" $REF $EF $EQUAL
-printf "UNDER %d\t\t\t%d\t\t\t%d\n" $REF $OF $OVER
-printf "CONTROL GROUP\t\t\t%d\t\t\t%d\n" $CF $CONTROL
+printf "OVER  %d\t\t\t%d\t\t\t%d\n" $REF $OF $OVER
+printf "NO BURST ERROR\t\t\t%d\t\t\t%d\n" $CF $CONTROL
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
     

@@ -1,0 +1,20 @@
+Use default CRC generator 0x04C11DB7?
+How many random trials?
+How many control trials?
+This will take a moment...
+
+                                                                      ][>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=>=
+
+DETECTED CORRUPTION IN 986 OF 1000 ERROR CASES, AND
+IN 0 OF 1000 CONTROL CASES.
+MISSED BURSTS OF THE FOLLOWING SIZES:
+0 1 2 3 4 
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+BURST ERROR LENGTH     |    NUMBER OF FRAMES     |    NUMBER DETECTED
+-----------------------------------------------------------------------
+UNDER 32			475			462
+EQUAL TO 32			17			17
+OVER  32			507			507
+NO BURST ERROR			1000			0
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
