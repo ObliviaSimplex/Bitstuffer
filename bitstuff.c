@@ -21,10 +21,10 @@
 
 void byte2bitstring(unsigned char byte, unsigned char *arr);
 void showbitbuffer(const unsigned char *bitbuffer, int len,
-                   unsigned int period, unsigned long int idx);
+                   unsigned int period, uint32_t idx);
 unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
                            unsigned int period, int stuff, int verbose,
-                           unsigned char stf);
+                           unsigned char stuffingbit);
  
 int main(int argc, char **argv){
   FILE *fd = stdin;
@@ -41,7 +41,7 @@ int main(int argc, char **argv){
     wrap = OFF;
   char filename[MAXFILENAMELENGTH] = "stdin\0";
   char format[8] = "%c";
-  unsigned char stf = 0;
+  unsigned char stuffingbit = 0;
   
   if (argc < 2)
     goto help;
@@ -69,10 +69,10 @@ int main(int argc, char **argv){
       }
       break;
     case '1':
-      stf = 1;
+      stuffingbit = 1;
       break;
     case '0':
-      stf = 0;
+      stuffingbit = 0;
       break;
     case 'f':
       strncpy(filename,optarg,MAXFILENAMELENGTH);
@@ -119,19 +119,22 @@ int main(int argc, char **argv){
     fprintf(stderr,"Fatal error opening %s.\n", filename);
     exit(EXIT_FAILURE);
   }
-
+  /*
   unsigned char *buffer = malloc(MAXBUFFERSIZE*2*sizeof(unsigned char));
   int bytecount = 0;
 
   do {
     buffer[bytecount++] = fgetc(fd);  
   } while  (!feof(fd) && bytecount < MAXBUFFERSIZE && (!dirty || bytecount <= inbytes));
-
-  buffer[bytecount-1] = '\0';
+  */
+  unsigned char *buffer = read_characters(fd, EOF);
+  int bytecount = strlen(buffer);
+  
+  //  buffer[bytecount-1] = '\0';
 
   /*** The main event ***/
   unsigned char *stuffed;
-  stuffed = bitstuffer(buffer, bytecount, P, S, verbose, stf);
+  stuffed = bitstuffer(buffer, bytecount, P, S, verbose, stuffingbit);
   bytecount = strlen(stuffed);
   /**********************/
 
@@ -171,16 +174,16 @@ int main(int argc, char **argv){
  ***/ 
 unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
                            unsigned int period, int stuff, int verbose,
-                           unsigned char stf) {
+                           unsigned char stuffingbit) {
   
-  unsigned long int bitlen = period ?
+  uint32_t bitlen = period ?
     len + len/period + len%period :
     len;
-  unsigned long int bitindex = 0;
-  unsigned long int p, i;
+  uint32_t bitindex = 0;
+  uint32_t p, i;
   unsigned char byte=0, bit=0;
   int tally = 0;
-  int ok = ON;
+  unsigned char ok = 1;
   
   unsigned char *bitbuffer;
   if ((bitbuffer = calloc (bitlen, sizeof(char))) == NULL){
@@ -192,25 +195,25 @@ unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
   for (p = 0; p < len; p++){
     byte = *(arr + p);
     for (i=0; i < 8; i++){
-      bit = byte & 1;
-      byte >>= 1;
-      if (ok)
-        setbit(bitbuffer, bitindex++, bit);//bitbuffer[idx++] = bit;
+      bit = byte & 1; // get the least significant bit off the byte
+      byte >>= 1;     // and then shift the byte over. 
+      if (ok)         // unless skipping the bit, go ahead and copy bit
+        setbit(bitbuffer, bitindex++, bit);
       else 
-        ok = ON;  // it's okay, now because we discarded a zero
-      tally += bit;
-      tally *= bit;
+        ok = 1;  // it's okay now, because we discarded a zero
+      tally += stuffingbit? !bit : bit; // increment tally if bit is 1 (or 0)
+      tally *= stuffingbit? !bit : bit; // reset tally if bit is 0     (or 1)
       ok = (tally != period) || stuff || !period;
       if (period && tally == period){
         tally = 0;
-        if (stuff)
-          setbit(bitbuffer, bitindex++, stf); 
-      }
+        if (stuff) // if stuffing (and not unstuffing), add stuffingbit now.
+          setbit(bitbuffer, bitindex++, stuffingbit); 
+      } // do nothing if unstuffing. Just skip this bit. 
     }
   }
-
   
   return(bitbuffer);
 }
+
 
 
