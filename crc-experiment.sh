@@ -30,6 +30,7 @@ read TRIALS
 echo "How many control trials?"
 read CONTROLTRIALS
 
+OUTFILE=crc-experiment.out
 REF=32
 FRAME=1520
 CAUGHT=0
@@ -87,6 +88,7 @@ echo IN $CONTROL OF $CF CONTROL CASES.
 echo MISSED BURSTS OF THE FOLLOWING SIZES:
 echo $MISSES | tr " " "\\n" | sort -n| uniq | tr "\\n" " "
 echo
+(
 echo
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo "BURST ERROR LENGTH     |    NUMBER OF FRAMES     |    NUMBER DETECTED"
@@ -96,5 +98,5 @@ printf "EQUAL TO %d\t\t\t%d\t\t\t%d\n" $REF $EF $EQUAL
 printf "OVER  %d\t\t\t%d\t\t\t%d\n" $REF $OF $OVER
 printf "NO BURST ERROR\t\t\t%d\t\t\t%d\n" $CF $CONTROL
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-
-    
+) | tee $OUTFILE && echo -e "\nSaved report in $OUTFILE"
+   
