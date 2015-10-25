@@ -34,7 +34,7 @@ int main(int argc, char **argv){
   
   if (argc < MINARGS)
     goto help;
-  while ((opt = getopt(argc, argv, "bvqg:ce:srh")) != -1){
+  while ((opt = getopt(argc, argv, "bvfqg:ce:srh")) != -1){
     switch(opt) {
     case 'b':
       input_as_binary = TRUE;
@@ -51,12 +51,19 @@ int main(int argc, char **argv){
     case 'v':
       verbose = TRUE;
       break;
+    case 'f':
+      fd = fopen(optarg,"r");
+      if (fd == NULL){
+        fprintf(stderr, "Error opening %s. Exiting.\n",optarg);
+        exit(EXIT_FAILURE);
+      }
+      break;
     case 'q':
       verbose = FALSE;
       break;
-    case 'R':
+      /*    case 'R':
       random_msg = TRUE;
-      break;
+      break; */
     case 'e':
       burst_length = atoi(optarg);
       break;
@@ -70,7 +77,20 @@ int main(int argc, char **argv){
     case 'h':
     default:
     help:
-      printf("Help message...\n");
+      printf(GREEN"CRC UTILITY\n"
+             YELLOW"=-=-=-=-=-=\n"COLOR_RESET
+             "Usage: %s [OPTIONS] \n"
+             "-v: verbose\n"
+             "-q: quiet (diable verbose output)\n"
+             "-f <filename>: supply file as input, instead of stdin\n"
+             "-b: read input as binary string of ASCII '0's and '1's\n"
+             "-c: read input as raw characters [default]\n"
+             "-s: perform send function only\n"
+             "-r: perform receive function only (default is both)\n"
+             "-e <burst length>: introduce burst error of <burst length> bits\n"
+             "-g <generator>: supply alternate CRC polynomial in hex or decimal\n"
+             , argv[0]);
+      exit(EXIT_FAILURE);
       break;
     }
   }
