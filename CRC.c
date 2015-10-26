@@ -223,7 +223,7 @@ bitarray_t * CRC(bitarray_t *message,
   fprintf(stderr,"\n");
   */
   //////////////////////////////////////////////////////////////
-  while (bit_index < bitmsg_out->end+shiftbitlen-1){
+  while (bit_index < bitmsg_out->end+shiftbitlen){
     
     bit = getbit(message->array, bit_index);
     bit_index ++;
