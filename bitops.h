@@ -331,7 +331,7 @@ char * stringify_chunky (const chunky_integer_t *ci, int bitlen){
   chunky_integer_t *standin = calloc (1, sizeof(chunky_integer_t));
   standin->integer = is_big_endian()? end_reverse(ci->integer) : ci->integer; 
   while (i < bitlen)
-    *(s + i) = getbit(standin->bytes, i++) + '0';
+    *(s + ((bitlen-1)-i)) = getbit(standin->bytes, i++) + '0';
   free(standin);
   return s;                     
 }
