@@ -95,8 +95,8 @@ echo
 echo
 (
   echo DETECTED CORRUPTION IN $CAUGHT OF $TRIALS ERROR CASES, AND IN $CONTROL OF $CF
-  echo CONTROL CASES.
-  echo MISSED BURSTS OF THE FOLLOWING SIZES:
+  echo CONTROL CASES. BURSTS WERE BETWEEN 1 AND 64 BITS IN SIZE, 0 FOR 
+  echo CONTROL GROUP. MISSED BURSTS OF THE FOLLOWING SIZES:
   echo $MISSES | tr " " "\\n" | sort -n| uniq | tr "\\n" " "
   echo -e "\n"
   echo Note that small bursts may be undetected simply because they failed to

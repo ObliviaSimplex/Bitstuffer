@@ -8,9 +8,11 @@
  **/
 
 #define MINARGS 2
-#define MAXLEN 0x10000
 #define DEFAULT_GENERATOR 0x04C11DB7
 
+#define LOG stdout
+
+#define SEND_RECV 2
 #define SEND 1
 #define RECV 0
 
@@ -27,7 +29,7 @@ int main(int argc, char **argv){
   int inputformat = 0;
   uint32_t input;
   char opt;
-  char direction = SEND;
+  char direction = SEND_RECV;
   char input_as_binary = FALSE;
   int burst_length = 0;
   char random_msg = TRUE;
@@ -50,7 +52,7 @@ int main(int argc, char **argv){
   // Parse the command line arguments. 
   if (argc < MINARGS)
     goto help;
-  while ((opt = getopt(argc, argv, "bvf:qg:ce:srh")) != -1){
+  while ((opt = getopt(argc, argv, "srbvf:qg:ce:h")) != -1){
     switch(opt) {
     case 'b':
       input_as_binary = TRUE;
@@ -58,12 +60,19 @@ int main(int argc, char **argv){
     case 'c':
       input_as_binary = FALSE;
       break;
+    case 's':
+      direction = SEND;
+      break;
+    case 'r':
+      direction = RECV;
+      break;
     case 'g':
       if (optarg[0] == '0' && optarg[1] == 'x')
         sscanf(optarg,"0x%x",&generator);
       else
         sscanf(optarg, "%d",&generator);
       break;
+    
     case 'v':
       verbose = TRUE;
       break;
@@ -117,15 +126,17 @@ int main(int argc, char **argv){
   }
   
   if (verbose){
-    fprintf(stderr,"MESSAGE READ: %s\n",orig_msg->array);
-    fprintf(stderr,"IN BINARY:    ");
-    print_bitarray(stderr, orig_msg);
-    fprintf(stderr,"\n");
+    fprintf(LOG,"MESSAGE READ: %s\n",orig_msg->array);
+    fprintf(LOG,"IN BINARY:    ");
+    print_bitarray(LOG, orig_msg);
+    fprintf(LOG,"\n");
   }
 
   // Calculate CRC remainder, and append it to the message.
-  bitarray_t *prep_msg = CRC(orig_msg, generator, SEND);
-
+  // If not sending, just alias prep_msg to orig_msg
+  bitarray_t *prep_msg = (direction >= SEND)?
+    CRC(orig_msg, generator, SEND) : orig_msg;
+  
   // Introduce a burst error, if requested (by command-line option
   // -e <length>). This may be either a burst of 1s or a burst of 0s. 
   if (burst_length){
@@ -134,8 +145,10 @@ int main(int argc, char **argv){
   }
 
   // Check the resulting message for bit errors. If no burst errors
-  // have been introduced, then no errors should be reported. 
-  bitarray_t *recv_msg = CRC(prep_msg, generator, RECV);
+  // have been introduced, then no errors should be reported.
+  // If not receiving, then just alias recv_msg to prep_msg
+  bitarray_t *recv_msg = (direction % SEND_RECV == RECV)?
+    CRC(prep_msg, generator, RECV) : prep_msg;
 
   // Return a 1 if there is a residue, 0 otherwise. To see the
   // actual residue, verbose should be enabled. Residue is stored
@@ -144,18 +157,21 @@ int main(int argc, char **argv){
 
   if (verbose) {
     if (!recv_msg->residue) {
-      fprintf(stdout, "NO CORRUPTION DETECTED.\n");
+      fprintf(LOG, "%s\n", (direction != SEND)?
+              "NO CORRUPTION DETECTED." : "NO RESIDUE GENERATED.");
     } else {
-      fprintf(stdout, "*** CORRUPTION DETECTED ***\n");
-      fprintf(stdout, "*** RESIDUE: 0x%lx\n",
+      if (direction != SEND)
+        fprintf(LOG, "*** CORRUPTION DETECTED ***\n");
+      fprintf(LOG, "*** RESIDUE: 0x%lx\n",
               (unsigned long int) recv_msg->residue);
     }
   }
 
   // Clean up the heap
-  destroy_bitarray(prep_msg);
-  destroy_bitarray(orig_msg);
-  destroy_bitarray(recv_msg);
+  
+  if (direction == SEND_RECV) destroy_bitarray(orig_msg);
+  if (direction == SEND || direction == SEND_RECV) destroy_bitarray(prep_msg);
+  if (direction == RECV || direction == SEND_RECV) destroy_bitarray(recv_msg);
   
   return retval;
 }
@@ -178,9 +194,9 @@ bitarray_t * CRC(bitarray_t *message,
   
   /////////
   if (verbose){
-    fprintf(stderr, "xorplate: ");
-    fprint_lint_bits(stderr, xorplate);
-    fprintf(stderr,"\n");
+    fprintf(LOG, "xorplate: ");
+    fprint_lint_bits(LOG, xorplate);
+    fprintf(LOG,"\n");
   }
   //////////
   
@@ -222,7 +238,7 @@ bitarray_t * CRC(bitarray_t *message,
 
     if (verbose){ 
       shiftreg_string = stringify_chunky(&shiftreg, shiftbitlen);
-      fprintf(stderr, "[%2.2d] SHIFTREG: %s  FED: %d  %s\n", bit_index,
+      fprintf(LOG, "[%2.2d] SHIFTREG: %s  FED: %d  %s\n", bit_index,
               shiftreg_string, bit,
               xored? "XOR EVENT" : "");
       free(shiftreg_string);
@@ -256,7 +272,7 @@ bitarray_t * CRC(bitarray_t *message,
       bitarray_push(bitmsg_out, getbit(shiftreg.bytes,i));
       // More verbose output:
       if (verbose)
-        fprintf(stderr, "(%d) copying %d from shiftreg to"
+        fprintf(LOG, "(%d) copying %d from shiftreg to"
                 " bitmsg_out bit #%d\n", i,getbit(shiftreg.bytes,i),
                 bitmsg_out->end-1);
      }
@@ -264,13 +280,13 @@ bitarray_t * CRC(bitarray_t *message,
 
   // More verbose output:
   if (verbose){
-    fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
-    fprintf(stderr,"IN:  ");
-    print_bitarray(stderr, message);
-    fprintf(stderr,"\n");
-    fprintf(stderr,"OUT: ");
-    print_bitarray(stderr, bitmsg_out);
-    fprintf(stderr,"\n\n");
+    fprintf(LOG,"bitmsg_out->end = %d\n",bitmsg_out->end);
+    fprintf(LOG,"IN:  ");
+    print_bitarray(LOG, message);
+    fprintf(LOG,"\n");
+    fprintf(LOG,"OUT: ");
+    print_bitarray(LOG, bitmsg_out);
+    fprintf(LOG,"\n\n");
   }
 
   return bitmsg_out;

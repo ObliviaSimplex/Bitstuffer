@@ -37,6 +37,7 @@ typedef struct bitarray {
   uint8_t *array;
   uint32_t end; // bit index of last bit + 1
   uint32_t residue;
+  uint32_t size;
 } bitarray_t;
 
 // Sometimes, we want to be able to treat an integer as
@@ -66,8 +67,10 @@ int is_big_endian(void){
  **/
 bitarray_t * make_bitarray(char *arr, int len){
   bitarray_t *ba = calloc(1,sizeof(bitarray_t));
-  ba->array = calloc(len, sizeof(char));
+  ba->size = len*2;
+  ba->array = calloc(ba->size, sizeof(char));
   memcpy(ba->array, arr, len);
+
   ba->end = len*8;
   ba->residue = 0;
   return ba;
@@ -148,12 +151,21 @@ unsigned char getbit(const unsigned char *byte, unsigned long int index){
  * Treat a bitarray_t struct's array field as a bit-stack, and push
  * a new bit on top. The bitarray keeps track of its last bit with the
  * end field, and this function increments that field after pushing. 
+ * If the bitarray is running out of space, then this function will 
+ * double the size of its array.
  * 
  * @param bitarray_t *ba    : pointer to bitarray
  * @param unsigned char bit : 0 or 1: the bit to push. 
  **/
 void bitarray_push(bitarray_t *ba, unsigned char bit){
   setbit(ba->array, (ba->end)++, bit%2);
+  if ((ba->end * 8) >= ((ba->size * 4) / 3)){
+    ba->size *= 2;
+    uint8_t *newarray = calloc (ba->size, sizeof(uint8_t));
+    memcpy(newarray, ba->array, ba->size/2);
+    free(ba->array);
+    ba->array = newarray;
+  }
 }
 
 /**
@@ -335,27 +347,18 @@ char * stringify_chunky (const chunky_integer_t *ci, int bitlen){
 bitarray_t * read_binary (FILE *channel){
   int size = 0x100;
   char endsig = '\n';
-  uint8_t * array = calloc(size,sizeof(uint8_t));
+  bitarray_t *ba = calloc(1,sizeof(bitarray_t));
+  ba->array = calloc(size,sizeof(uint8_t));
+  ba->end = 0;
+  ba->size = size;
+  ba->residue = 0;
   int b = 0, i = 0;
   char glyph;
   while (((glyph = fgetc(channel)) != endsig) && (!feof(channel))){
-    i = b/8; b++;
-    array[i] <<= 1;
-    array[i] |= (glyph-'0');
-    if (i >= (size*3)/4){
-      size *= 2;
-      uint8_t *copy = calloc(size,sizeof(uint8_t));
-      memcpy(copy, array, i);
-      free(array);
-      array = copy;
-    }
-  };
-  i++;
-  bitarray_t *ba = calloc(1, sizeof(bitarray_t));
-  ba->array = calloc(i,sizeof(char));
-  memcpy(ba->array, array,i);
-  ba->end = b;
-  ba->residue = 0;
+    if (glyph != '0' && glyph != '1')
+      break;
+    bitarray_push(ba,(glyph - '0'));
+  }
   return ba;  
 }
 
