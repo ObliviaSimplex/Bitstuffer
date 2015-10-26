@@ -194,18 +194,19 @@ bitarray_t * CRC(bitarray_t *message,
   
   /////////
   if (verbose){
-    fprintf(LOG, "xorplate: ");
+    fprintf(LOG, "XORPLATE:     ");
     fprint_lint_bits(LOG, xorplate);
     fprintf(LOG,"\n");
   }
   //////////
   
   bitarray_t *bitmsg_out;
-  //fprintf(stderr,"message->end = %d\n",message->end);
+
   bitmsg_out = calloc(1,sizeof(bitarray_t));
   bitmsg_out->array = calloc((message->end/8) + shiftbitlen/8 + 2, sizeof(char));
   bitmsg_out->end = message->end; // + ((send == SEND)? shiftbitlen : 0); //??
   bitmsg_out->residue = 0;
+  bitmsg_out->size = message->end/4; // todo: tidy up and put inside a builder function
   
   uint32_t bit_index = 0;
 
@@ -280,7 +281,6 @@ bitarray_t * CRC(bitarray_t *message,
 
   // More verbose output:
   if (verbose){
-    fprintf(LOG,"bitmsg_out->end = %d\n",bitmsg_out->end);
     fprintf(LOG,"IN:  ");
     print_bitarray(LOG, message);
     fprintf(LOG,"\n");

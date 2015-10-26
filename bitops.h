@@ -247,8 +247,9 @@ void burst_error(unsigned char *message, int msglen,
                  int errbitlen, int highlow){
   int errbytes = errbitlen / 8;
   unsigned char errbytemask = 0xffff << (errbitlen % 8);
-  int index = rand() % (msglen-errbytes-1);
-  memset(message+index, highlow, errbytes);
+  int index = (msglen-errbytes-1 > 0)? rand() % (msglen-errbytes-1)
+    : 0;
+  if (errbytes) memset(message+index, highlow, errbytes);
   *(message + index + errbytes) &= errbytemask;
   return;
 }
