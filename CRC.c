@@ -31,6 +31,7 @@ int main(int argc, char **argv){
   char opt;
   char direction = SEND_RECV;
   char input_as_binary = FALSE;
+  char output_binary_only = FALSE;
   int burst_length = 0;
   char random_msg = TRUE;
   int random_msg_size = 1520;
@@ -52,7 +53,7 @@ int main(int argc, char **argv){
   // Parse the command line arguments. 
   if (argc < MINARGS)
     goto help;
-  while ((opt = getopt(argc, argv, "srbvf:qg:ce:h")) != -1){
+  while ((opt = getopt(argc, argv, "srbvf:qg:ce:ho")) != -1){
     switch(opt) {
     case 'b':
       input_as_binary = TRUE;
@@ -62,6 +63,10 @@ int main(int argc, char **argv){
       break;
     case 's':
       direction = SEND;
+      break;
+    case 'o':
+      output_binary_only = TRUE;
+      verbose = FALSE;
       break;
     case 'r':
       direction = RECV;
@@ -101,8 +106,11 @@ int main(int argc, char **argv){
              "-q: quiet (diable verbose output)\n"
              "-f <filename>: supply file as input, instead of stdin\n"
              "-f - : read from stdin (default)\n"
+             "-s: execute send phase only; append remainder, but do not check\n"
+             "-r: execute receive phase only; check for remainder, but don't append\n"
              "-b: read input as binary string of ASCII '0's and '1's\n"
              "-c: read input as raw characters [default]\n"
+             "-o: output bitstring only: use with -b to chain CRC pipes together\n"
              "-e <burst length>: introduce burst error of <burst length> bits\n"
              "-g <generator>: supply alternate CRC polynomial in hex or decimal\n"
              "-h: display this help menu.\n"
@@ -166,7 +174,12 @@ int main(int argc, char **argv){
               (unsigned long int) recv_msg->residue);
     }
   }
-
+  
+  if (output_binary_only){
+    print_bitarray(stdout, recv_msg);
+    printf("\n");
+ }
+  
   // Clean up the heap
   
   if (direction == SEND_RECV) destroy_bitarray(orig_msg);
@@ -288,6 +301,7 @@ bitarray_t * CRC(bitarray_t *message,
     print_bitarray(LOG, bitmsg_out);
     fprintf(LOG,"\n\n");
   }
+  
 
   return bitmsg_out;
 }
