@@ -1,4 +1,14 @@
 #! /usr/bin/env bash
+###############################
+# A testing tool for CRC.c
+#
+# Author: Olivia Lucca Fraser
+# ID: B00109376
+# Date: October 25, 2015
+###############################
+
+OUTFILE=crc-experiment.out
+(figlet "CRC Tester" 2> /dev/null || echo -e "CRC TESTER\n=-=-=-=-=-\n") 
 
 gcc CRC.c -o CRC
 if (( $? != 0 )); then
@@ -25,12 +35,12 @@ while (( $NOTREADY )); do
     fi
 done
 
-echo "How many random trials?"
+echo "How many random burst-error trials?"
 read TRIALS
-echo "How many control trials?"
+echo "How many error-free control trials?"
 read CONTROLTRIALS
 
-OUTFILE=crc-experiment.out
+
 REF=32
 FRAME=1520
 CAUGHT=0
@@ -64,9 +74,9 @@ for (( i=1; $i < $T; i++ )); do
     (( $BURST == $REF )) && EF=$(( $EF + 1 ))
     (( $BURST == 0 )) && CF=$(( $CF + 1 ))
     ## Now run the CRC binary
-    cat /dev/urandom | tr -dc A-Za-z0-9| head -c $FRAME | ./CRC $GENFLAG 11 -q -e $BURST | grep -q RESIDUE
+    cat /dev/urandom | tr -dc A-Za-z0-9| head -c $FRAME | ./CRC $GENFLAG 11 -q -e $BURST  
     ## 
-    if (( $? == 0 )); then
+    if (( $? != 0 )); then
         CAUGHT=$(( $CAUGHT + 1 ))
         (( $BURST < $REF )) && (( $BURST != 0 )) && \
             UNDER=$(( $UNDER + 1 ))
@@ -83,20 +93,22 @@ for (( j=0; j < $W; j++ )); do
 done
 echo
 echo
-echo DETECTED CORRUPTION IN $CAUGHT OF $TRIALS ERROR CASES, AND
-echo IN $CONTROL OF $CF CONTROL CASES.
-echo MISSED BURSTS OF THE FOLLOWING SIZES:
-echo $MISSES | tr " " "\\n" | sort -n| uniq | tr "\\n" " "
-echo
 (
-echo
-echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-echo "BURST ERROR LENGTH     |    NUMBER OF FRAMES     |    NUMBER DETECTED"
-echo "-----------------------------------------------------------------------"
-printf "UNDER %d\t\t\t%d\t\t\t%d\n" $REF $UF $UNDER
-printf "EQUAL TO %d\t\t\t%d\t\t\t%d\n" $REF $EF $EQUAL
-printf "OVER  %d\t\t\t%d\t\t\t%d\n" $REF $OF $OVER
-printf "NO BURST ERROR\t\t\t%d\t\t\t%d\n" $CF $CONTROL
-echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+  echo DETECTED CORRUPTION IN $CAUGHT OF $TRIALS ERROR CASES, AND IN $CONTROL OF $CF
+  echo CONTROL CASES.
+  echo MISSED BURSTS OF THE FOLLOWING SIZES:
+  echo $MISSES | tr " " "\\n" | sort -n| uniq | tr "\\n" " "
+  echo -e "\n"
+  echo Note that small bursts may be undetected simply because they failed to
+  echo flip any bits. This is also possible for large bursts, but less likely.
+  echo 
+  echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+  echo "BURST ERROR LENGTH     |    NUMBER OF FRAMES     |    NUMBER DETECTED"
+  echo "-----------------------------------------------------------------------"  
+  printf "UNDER %d\t\t\t%d\t\t\t%d\n" $REF $UF $UNDER
+  printf "EQUAL TO %d\t\t\t%d\t\t\t%d\n" $REF $EF $EQUAL
+  printf "OVER  %d\t\t\t%d\t\t\t%d\n" $REF $OF $OVER
+  printf "NO BURST ERROR\t\t\t%d\t\t\t%d\n" $CF $CONTROL
+  echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 ) | tee $OUTFILE && echo -e "\nSaved report in $OUTFILE"
    

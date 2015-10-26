@@ -1,15 +1,12 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 #include "bitops.h"
 
-#define GREEN   "\x1b[32m"
-#define YELLOW  "\x1b[33m"
-#define BLUE    "\x1b[34m"
-#define CYAN    "\x1b[36m"
-#define MAGENTA "\x1b[35m"
-#define COLOR_RESET   "\x1b[0m"
+/**
+ * Author: Olivia Lucca Fraser
+ * ID: B00109376
+ * Date: October 25, 2015
+ **/
+
 
 #define PER_DEFAULT 5
 #define MAXFILENAMELENGTH 64
@@ -42,10 +39,10 @@ int main(int argc, char **argv){
   char filename[MAXFILENAMELENGTH] = "stdin\0";
   char format[8] = "%c";
   unsigned char stuffingbit = 0;
-  
+
+  // Parse command line arguments. 
   if (argc < 2)
-    goto help;
-  
+    goto help;  
   while ((opt = getopt(argc, argv, "10usqbcd:p:f:x")) != -1){
     switch (opt) {
     case 'u':
@@ -119,25 +116,17 @@ int main(int argc, char **argv){
     fprintf(stderr,"Fatal error opening %s.\n", filename);
     exit(EXIT_FAILURE);
   }
-  /*
-  unsigned char *buffer = malloc(MAXBUFFERSIZE*2*sizeof(unsigned char));
-  int bytecount = 0;
 
-  do {
-    buffer[bytecount++] = fgetc(fd);  
-  } while  (!feof(fd) && bytecount < MAXBUFFERSIZE && (!dirty || bytecount <= inbytes));
-  */
   unsigned char *buffer = read_characters(fd, EOF);
   int bytecount = strlen(buffer);
   
-  //  buffer[bytecount-1] = '\0';
-
   /*** The main event ***/
   unsigned char *stuffed;
   stuffed = bitstuffer(buffer, bytecount, P, S, verbose, stuffingbit);
   bytecount = strlen(stuffed);
   /**********************/
 
+  // Print the results to stdout, in the requested format. 
   int j=0;
   unsigned char ch, bitstring[8*sizeof(unsigned char)+1];
   while ((j < bytecount && ((ch = stuffed[j++]) != '\0')) || dirty){
@@ -211,9 +200,7 @@ unsigned char * bitstuffer(const unsigned char *arr, unsigned int len,
       } // do nothing if unstuffing. Just skip this bit. 
     }
   }
-  
   return(bitbuffer);
 }
-
 
 

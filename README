@@ -3,6 +3,7 @@
 | _ \ |  _(_-<  _| || |  _|  _/ -_) '_|
 |___/_|\__/__/\__|\_,_|_| |_| \___|_|
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 Olivia Lucca Fraser         
 October 16, 2015
 
@@ -110,7 +111,45 @@ Reducing the period size to 4 works well for ASCII files as well.
 unsanitized input. Something is getting fuzzed and should be
 debugged.)
 
+  ___ ___  ___   _   _ _   _ _ _ _
+ / __| _ \/ __| | | | | |_(_) (_) |_ _  _
+| (__|   / (__  | |_| |  _| | | |  _| || |
+ \___|_|_\\___|  \___/ \__|_|_|_|\__|\_, |
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=|__/-=
 
+Olivia Lucca Fraser
+October 25, 2015
 
+This is a straightforward implementation of the shift-register
+algorithm for computing cyclic redundancy checks on bitstreams.
 
+An automated series of tests can be run using the bash script,
+crc-experiment.sh, or the utility can be played with directly.
+The utility admits a variety of command line options, which are
+detailed in the help menu:
 
+CRC UTILITY
+=-=-=-=-=-=
+Usage: ./CRC [OPTIONS]
+-v: verbose
+-q: quiet (diable verbose output)
+-f <filename>: supply file as input, instead of stdin
+-f - : read from stdin (default)
+-b: read input as binary string of ASCII '0's and '1's
+-c: read input as raw characters [default]
+-e <burst length>: introduce burst error of <burst length> bits
+-g <generator>: supply alternate CRC polynomial in hex or decimal
+-h: display this help menu.
+
+Input can be provided as either a stream of raw characters (using
+the -c flag, which is also the default setting), or binary notation
+(using the -b flag) -- i.e., a series of ASCII '0's and '1's (bytes
+0x30 and 0x31, not 0x00 and 0x01). 
+
+A burst error can be introduced using the -e flag, and an integer
+argument.
+
+The default generator is 0x04C11DB7, which is commonly used in
+CRC-32 applications. Other generators can be substituted for this
+one, using the -g flag, and a numerical argument (in either decimal
+or hexidecimal notation). 

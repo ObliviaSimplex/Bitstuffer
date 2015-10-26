@@ -1,11 +1,13 @@
 #include "bitops.h"
 #include "unistd.h"
 
-#define BINARY  0
-#define DECIMAL  1
-#define HEX  2
-#define ASCII  3
-#define MINARGS 0
+/**
+ * Author: Olivia Lucca Fraser
+ * ID: B00109376
+ * Date: October 25, 2015
+ **/
+
+#define MINARGS 2
 #define MAXLEN 0x10000
 #define DEFAULT_GENERATOR 0x04C11DB7
 
@@ -14,7 +16,7 @@
 
 bitarray_t * CRC(bitarray_t *message,
                  uint32_t generator,
-                 unsigned char send);
+                 unsigned char mode);
 
 int verbose = 1;
 
@@ -31,10 +33,24 @@ int main(int argc, char **argv){
   char random_msg = TRUE;
   int random_msg_size = 1520;
   uint32_t generator = DEFAULT_GENERATOR;
-  
+
+  if (is_big_endian()){
+    fprintf(stderr, "*****************************************\n"
+                    "Warning: this is a big-endian system.\n"
+                    "The programme may not work as expected,\n"
+                    "and is limited to using default settings,\n"
+                    "due to compatibility issues with unistd.h\n"
+                    "\nThis utility reads from stdin. If it is\n"
+                    "hanging, hit Ctrl-C to exit, and then\n"
+                    "relaunch it as the target of a pipe, i.e.\n"
+                    "echo Hello World | ./CRC\n"
+                    "*****************************************\n");
+    goto skipopts;
+  }
+  // Parse the command line arguments. 
   if (argc < MINARGS)
     goto help;
-  while ((opt = getopt(argc, argv, "bvfqg:ce:srh")) != -1){
+  while ((opt = getopt(argc, argv, "bvf:qg:ce:srh")) != -1){
     switch(opt) {
     case 'b':
       input_as_binary = TRUE;
@@ -52,6 +68,8 @@ int main(int argc, char **argv){
       verbose = TRUE;
       break;
     case 'f':
+      if (optarg[0] == '-')
+        break;
       fd = fopen(optarg,"r");
       if (fd == NULL){
         fprintf(stderr, "Error opening %s. Exiting.\n",optarg);
@@ -61,19 +79,9 @@ int main(int argc, char **argv){
     case 'q':
       verbose = FALSE;
       break;
-      /*    case 'R':
-      random_msg = TRUE;
-      break; */
     case 'e':
       burst_length = atoi(optarg);
       break;
-    case 's':
-      direction = SEND;
-      break;
-    case 'r':
-      direction = RECV;
-      break;
-
     case 'h':
     default:
     help:
@@ -83,70 +91,81 @@ int main(int argc, char **argv){
              "-v: verbose\n"
              "-q: quiet (diable verbose output)\n"
              "-f <filename>: supply file as input, instead of stdin\n"
+             "-f - : read from stdin (default)\n"
              "-b: read input as binary string of ASCII '0's and '1's\n"
              "-c: read input as raw characters [default]\n"
-             "-s: perform send function only\n"
-             "-r: perform receive function only (default is both)\n"
              "-e <burst length>: introduce burst error of <burst length> bits\n"
              "-g <generator>: supply alternate CRC polynomial in hex or decimal\n"
+             "-h: display this help menu.\n"
              , argv[0]);
       exit(EXIT_FAILURE);
       break;
     }
   }
-  
-  if (is_big_endian()){
-    fprintf(stderr, "Warning: this is a big-endian system.\n"
-            "This programme may not work as expected.\n");
-  }
-  
-  bitarray_t *bitmsg;
-  
+ skipopts:
+  opt=0;
+  bitarray_t *orig_msg;
+
+  // Read the input as ASCII '0's and '1's if requested, and
+  // convert to an actual bitarray
   if (input_as_binary == FALSE){ 
-    char *txtmsg = read_characters(fd, EOF);
-    bitmsg = make_bitarray(txtmsg, strlen(txtmsg));
-    free(txtmsg);
+    char *txt_msg = read_characters(fd, EOF);
+    orig_msg = make_bitarray(txt_msg, strlen(txt_msg));
+    free(txt_msg);
   } else {
-    bitmsg = read_binary(fd);
+    orig_msg = read_binary(fd);
   }
   
-
-  //char inputstring[0x1000];
-  //scanf("%s",inputstring);
-  //bitmsg = make_bitarray(inputstring, strlen(inputstring));
-
   if (verbose){
-    fprintf(stderr,"MESSAGE READ: %s\n",bitmsg->array);
+    fprintf(stderr,"MESSAGE READ: %s\n",orig_msg->array);
     fprintf(stderr,"IN BINARY:    ");
-    print_bitarray(stderr, bitmsg);
+    print_bitarray(stderr, orig_msg);
     fprintf(stderr,"\n");
   }
-  /// AD HOC:
-  bitmsg->end++;
-  ///
-  
-  bitarray_t *newmsg = CRC(bitmsg, generator, SEND);
 
+  // Calculate CRC remainder, and append it to the message.
+  bitarray_t *prep_msg = CRC(orig_msg, generator, SEND);
+
+  // Introduce a burst error, if requested (by command-line option
+  // -e <length>). This may be either a burst of 1s or a burst of 0s. 
   if (burst_length){
-    burst_error(newmsg->array, newmsg->end/8, burst_length, 0);
+    burst_error(prep_msg->array, prep_msg->end/8,
+                burst_length, (char) clock()%2);
   }
+
+  // Check the resulting message for bit errors. If no burst errors
+  // have been introduced, then no errors should be reported. 
+  bitarray_t *recv_msg = CRC(prep_msg, generator, RECV);
+
+  // Return a 1 if there is a residue, 0 otherwise. To see the
+  // actual residue, verbose should be enabled. Residue is stored
+  // in bitarray_t field named 'residue'.
+  unsigned char retval = (unsigned char) !!recv_msg->residue;
+
+  if (verbose) {
+    if (!recv_msg->residue) {
+      fprintf(stdout, "NO CORRUPTION DETECTED.\n");
+    } else {
+      fprintf(stdout, "*** CORRUPTION DETECTED ***\n");
+      fprintf(stdout, "*** RESIDUE: 0x%lx\n",
+              (unsigned long int) recv_msg->residue);
+    }
+  }
+
+  // Clean up the heap
+  destroy_bitarray(prep_msg);
+  destroy_bitarray(orig_msg);
+  destroy_bitarray(recv_msg);
   
-  bitarray_t *recvmsg = CRC(newmsg, generator, RECV);
-  
-  destroy_bitarray(newmsg);
-  destroy_bitarray(bitmsg);
-  destroy_bitarray(recvmsg);
-  
-  return 0;
+  return retval;
 }
 
 
 bitarray_t * CRC(bitarray_t *message,
                  uint32_t generator,
-                 unsigned char send){
+                 unsigned char mode){
 
   int shiftbitlen = 0;
-  //generator = end_reverse(generator);
   uint32_t g = generator;
   while ((g >>= 1) != 0)
     shiftbitlen ++;
@@ -188,7 +207,7 @@ bitarray_t * CRC(bitarray_t *message,
   */
   //////////////////////////////////////////////////////////////
   while (bit_index < bitmsg_out->end+shiftbitlen){
-
+    
     bit = getbit(message->array, bit_index);
     bit_index ++;
     shiftreg.integer = (shiftreg.integer << 1) & shiftreg_cropmask;
@@ -210,36 +229,40 @@ bitarray_t * CRC(bitarray_t *message,
       xored = 0;
     }
   }
-  ////////////////////////////////////////////////////////////
+
+  // Some special attention is needed for porting this to
+  // big-endian architectures, like PowerPC (experimental)
   if (is_big_endian())
     shiftreg.integer = end_reverse(shiftreg.integer);
 
-  //memcpy(bitmsg_out->array, message->array,
-  //       message->end/8 + 2);//((message->end % 8 == 0)? 0 : 1));
   int j = 0;
   while (j < (message->end/8)+1)
     bitmsg_out->array[j] = message->array[j++];
-  /// FALSE POSITIVE FOR CORRUPTION WHEN INPUT EXCEEDS 192 BITS.
-  /// PROBLEM EXISTS FOR BO5TH BINARY AND CHARACTER INPUT
-  /// COMPLETELY PUZZLED
   
+  if (is_big_endian())
+    shiftreg.integer = end_reverse(shiftreg.integer);
+
+  // Whether or not we append it to the message, we always store the
+  // residue in the "residue" field of the struct, so that it can be
+  // treated as a return value of the function, along with the msg.
+  // This is just a convenience. We could extract it by counting back
+  // from bitmsg_out->end, if we know the generator in advance. 
   bitmsg_out->residue = shiftreg.integer;
 
-  //fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
+  // When in "SEND" mode, append the remainder to the end of the msg 
   int i;
-  if (send == SEND) {
+  if (mode == SEND) {
     for (i = shiftbitlen-1; i >= 0; i --){
-      //for (i=0; i < shiftbitlen; i++){
       bitarray_push(bitmsg_out, getbit(shiftreg.bytes,i));
+      // More verbose output:
       if (verbose)
         fprintf(stderr, "(%d) copying %d from shiftreg to"
                 " bitmsg_out bit #%d\n", i,getbit(shiftreg.bytes,i),
                 bitmsg_out->end-1);
      }
   }
-  
-  
 
+  // More verbose output:
   if (verbose){
     fprintf(stderr,"bitmsg_out->end = %d\n",bitmsg_out->end);
     fprintf(stderr,"IN:  ");
@@ -250,52 +273,5 @@ bitarray_t * CRC(bitarray_t *message,
     fprintf(stderr,"\n\n");
   }
 
-  if (send == RECV) {
-    if (!bitmsg_out->residue)
-      fprintf(stdout, "NO CORRUPTION DETECTED.\n");
-    else{
-      fprintf(stdout, "*** CORRUPTION DETECTED ***\n");
-      fprintf(stdout, "*** RESIDUE: 0x%lx\n",
-              (unsigned long int) bitmsg_out->residue);
-    }
-  }
-
-  /*
-  fprintf(stderr, "Value in shiftreg: %x\n", shiftreg.integer);
-  fprintf(stderr, "First byte in shiftreg: %x\n", shiftreg.bytes[0]);
-  fprintf(stderr, "message->end: %d (%x); bitmsg_out->end: %d (%x)\n",
-          message->end, getbit(message->array, message->end),
-          bitmsg_out->end, getbit(bitmsg_out->array, bitmsg_out->end));
-  fprintf(stderr, "About to send back: %s\n",bitmsg_out->array);
-  */
   return bitmsg_out;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
